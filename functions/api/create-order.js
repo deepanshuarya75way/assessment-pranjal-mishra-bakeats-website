@@ -10,14 +10,14 @@ export async function onRequestPost({ request, env }) {
     return error(400, 'Invalid JSON body')
   }
 
-  const { items, currency = 'INR', receipt } = body
+  const { items, currency = 'INR', receipt, deliveryArea } = body
   if (!items || !Array.isArray(items) || items.length === 0) {
     return error(400, 'Invalid items')
   }
 
   let amount
   try {
-    amount = computeTotal(items) * 100 // paise
+    amount = computeTotal(items, deliveryArea) * 100 // paise
   } catch (err) {
     return error(400, err.message)
   }

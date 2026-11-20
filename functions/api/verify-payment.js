@@ -21,11 +21,13 @@ export async function onRequestPost({ request, env, waitUntil }) {
     customerPhone,
     customerAddress,
     items,
+    deliveryArea, 
+
   } = body
 
   let totalAmount
   try {
-    totalAmount = computeTotal(items)
+    totalAmount = computeTotal(items, deliveryArea)
   } catch (err) {
     return error(400, err.message)
   }

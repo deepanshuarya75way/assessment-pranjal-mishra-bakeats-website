@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getAreaDiscountPercentage } from '../../../functions/_lib/prices'
 import { useCart } from '../../context/CartContext'
 import './Checkout.css'
 
@@ -17,11 +18,13 @@ function loadRazorpayScript() {
   })
 }
 
-const INITIAL_FORM = { name: '', email: '', phone: '', address: '' }
+const INITIAL_FORM = { name: '', email: '', phone: '', address: '', deliveryArea: '' }
 
 export default function Checkout() {
-  const { items, totalAmount, clearCart, checkoutOpen, setCheckoutOpen } = useCart()
+  const { items, totalAmount: cartTotal, clearCart, checkoutOpen, setCheckoutOpen } = useCart()
   const [form, setForm] = useState(INITIAL_FORM)
+  const discountPct = getAreaDiscountPercentage(form.deliveryArea)
+  const totalAmount = Math.round((cartTotal * (100 - discountPct)) / 100)
   const [errors, setErrors] = useState({})
   const [step, setStep] = useState('form') // 'form' | 'processing' | 'success' | 'failed'
   const [confirmedOrder, setConfirmedOrder] = useState(null)
@@ -52,6 +55,7 @@ export default function Checkout() {
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Valid email required'
     if (!form.phone.trim() || !/^[6-9]\d{9}$/.test(form.phone)) e.phone = 'Valid 10-digit mobile number required'
     if (!form.address.trim()) e.address = 'Delivery address is required'
+    if (form.deliveryArea && !/^\d{6}$/.test(form.deliveryArea)) e.deliveryArea = 'Enter a valid 6 digit pincode'
     return e
   }
 
@@ -77,7 +81,7 @@ export default function Checkout() {
       const res = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: items.map(i => ({ title: i.title, qty: i.qty })), currency: 'INR', receipt: `receipt_${Date.now()}` }),
+        body: JSON.stringify({ items: items.map(i => ({ title: i.title, qty: i.qty })), deliveryArea: form.deliveryArea, currency: 'INR', receipt: `receipt_${Date.now()}` }),
       })
       if (!res.ok) throw new Error()
       orderData = await res.json()
@@ -110,6 +114,7 @@ export default function Checkout() {
               customerEmail: form.email,
               customerPhone: form.phone,
               customerAddress: form.address,
+              deliveryArea: form.deliveryArea,
               items: items.map(i => ({ title: i.title, type: i.type, qty: i.qty, price: i.price, image: i.image, description: i.description })),
               totalAmount,
             }),
@@ -285,8 +290,15 @@ export default function Checkout() {
               <div className="co-summary-footer">
                 <div className="co-summary-row">
                   <span>Subtotal</span>
-                  <span>₹{totalAmount}</span>
+                  <span>₹{cartTotal}</span>
                 </div>
+                {discountPct > 0 && (
+                  <div className="co-summary-row">
+                  <span>Area Discount ({discountPct}%)</span>
+                  <span className='co-free'>-₹{cartTotal-totalAmount}</span>
+                  </div>
+                 )}
+                
                 <div className="co-summary-row">
                   <span>Delivery</span>
                   <span className="co-free">FREE</span>
@@ -324,6 +336,7 @@ export default function Checkout() {
                   </div>
                   {errors.phone && <span className="co-error">{errors.phone}</span>}
                 </div>
+          
 
                 <div className="co-field">
                   <label htmlFor="co-address">Delivery Address</label>
@@ -331,6 +344,17 @@ export default function Checkout() {
                     rows={3} value={form.address} onChange={handleChange} className={errors.address ? 'error' : ''} autoComplete="street-address" />
                   {errors.address && <span className="co-error">{errors.address}</span>}
                 </div>
+
+                <div className="co-field">
+                  <label htmlFor="co-area">Delivery Pincode</label>
+                  <input id="co-area" name="deliveryArea" inputMode='numeric' maxLength={6}
+                  placeholder="000000" value={form.deliveryArea} onChange={handleChange}
+                  className={errors.deliveryArea ? 'error' : ''} />
+                  {errors.deliveryArea && <span className='co-error'>{errors.deliveryArea}</span>}
+                  {discountPct > 0 && <span>{discountPct}% area discount applied</span>}
+                </div>
+              
+
 
                 <button type="submit" className="btn co-pay-btn">
                   <span className="co-pay-lock">🔒</span>
